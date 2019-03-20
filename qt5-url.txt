@@ -1,0 +1,2 @@
+https://www.riverbankcomputing.com/static/Downloads/sip/sip-4.19.15.tar.gz
+https://www.riverbankcomputing.com/static/Downloads/PyQt5/PyQt5_gpl-5.12.1.tar.gz
