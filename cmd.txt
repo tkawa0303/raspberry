@@ -1,0 +1,64 @@
+# Raspberry Piへ入力するコマンド集
+MONOxITのセミナー「Raspberry Pi + AI + MQT」ハンズオンで使うコマンド集です。  
+コピー＆ペーストして使います。  
+## 使いかた
+1. コマンドを選択し右クリックしメニューから「コピー」
+1. Raspberry PiのLXTerminalのメニューから「編集」「貼り付け」
+(注意）かならず一行ずつコピーペースト。エラーがないことを確認してから次のコマンドをコピーペーストする。
+# ハンズオン１：人工知能を動かす
+~~~
+workon cv
+cd ai101
+~~~
+~~~
+python tfpi.py -p ssd_mobilenet_v1_coco_2017_11_17.pbtxt \
+    -w ssd_mobilenet_v1_coco_2017_11_17/frozen_inference_graph.pb
+~~~
+~~~
+vcgencmd measure_temp
+vcgencmd measure_clock arm
+~~~
+~~~
+htop
+~~~
+~~~
+cat tfpi.py
+~~~
+# ハンズオン２：アノテーション
+
+~~~
+cd labelImg-1.7.0
+python3 labelImg.py
+~~~
+
+
+# ハンズオン９：移植した人工知能を動かす
+LXTerminalを新しく開いたときは workon でOpenCV環境へ切り替える 
+~~~
+workon cv
+~~~
+~~~
+cd ~/ai101
+~~~
+~~~
+mv ~/Desktop/raccoon.pbtxt ~/ai101/
+mv ~/Desktop/frozen_inference_graph.pb ~/ai101/raccoon.pb
+python tfpi.py -p raccoon.pbtxt -w raccoon.pb
+~~~
+
+# ハンズオン１０：
+LXTerminalを新しく開いたときは workon でOpenCV環境へ切り替える 
+~~~
+workon cv
+~~~
+~~~
+cd ~/ai101
+~~~
+~~~
+python tfpinet.py -p ssd_mobilenet_v1_coco_2017_11_17.pbtxt \
+    -w ssd_mobilenet_v1_coco_2017_11_17/frozen_inference_graph.pb \
+    -i 3
+~~~
+~~~
+htop
+~~~

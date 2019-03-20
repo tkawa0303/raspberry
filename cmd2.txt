@@ -1,0 +1,158 @@
+# シェルへ入力するコマンド集 
+コピーアイコンのクリックでコピー＆シェル画面を選択しCtrl-vでペーストして使います。  
+
+## ハンズオン３：人工知能学習環境の準備
+~~~
+git clone --depth 1 https://github.com/monoxit/models.git tfmodels
+~~~
+~~~
+cd tfmodels/research
+protoc object_detection/protos/*.proto --python_out=.
+python setup.py sdist
+(cd slim && python setup.py sdist)
+~~~
+~~~
+ls dist
+ls slim/dist
+~~~
+~~~
+export PROJECT=$(gcloud config list project --format "value(core.project)")
+export YOUR_GCS_BUCKET="gs://${PROJECT}-ml"
+export PYTHONPATH="$(pwd):$(pwd)/slim"
+echo export PROJECT=$(gcloud config list project --format "value(core.project)") >> ~/.bashrc
+echo export YOUR_GCS_BUCKET="gs://${PROJECT}-ml"  >> ~/.bashrc
+echo export PYTHONPATH="$(pwd):$(pwd)/slim" >> ~/.bashrc
+~~~
+~~~
+gsutil mb -l us-central1 "${YOUR_GCS_BUCKET}"
+~~~
+## ハンズオン４：入力データー準備
+~~~
+pip install --user --upgrade pillow
+pip install --user --upgrade pandas
+~~~
+~~~
+cd ~/tfmodels/research
+git clone https://github.com/monoxit/raccoon_dataset.git
+~~~
+~~~
+cd raccoon_dataset
+mkdir annotations/val
+find ./annotations/ | grep .xml | sort -R | tail -n 40 | xargs -n 1 sh -c 'mv -v $0 ./annotations/val/'
+~~~
+~~~
+python xml_to_csv.py annotations train_labels.csv
+python xml_to_csv.py annotations/val val_labels.csv
+~~~
+~~~
+cat train_labels.csv
+~~~
+~~~
+python generate_tfrecord.py \
+        --csv_input train_labels.csv \
+        --images_dir images \
+        --output_path train.record
+~~~
+~~~
+python generate_tfrecord.py \
+        --csv_input val_labels.csv \
+        --images_dir images \
+        --output_path val.record
+~~~
+~~~
+gsutil cp \*.record ${YOUR_GCS_BUCKET}/data/
+~~~
+## ハンズオン５：人工知能学習の準備
+nano エディタでlabel_map.pbtxtを新規作成  
+~~~
+nano label_map.pbtxt
+~~~
+次の定義をエディタへ入力（コピー＆ペースト）  
+~~~
+item {
+    id: 1
+    name: 'raccoon'
+}
+~~~
+Ctrl-xでエディタ終了  
+Save modified buffer?で y＜Enter＞
+~~~
+cat label_map.pbtxt
+~~~
+catで表示した内容がエディタへコピーした内容と同じことを確認  
+~~~
+gsutil cp label_map.pbtxt ${YOUR_GCS_BUCKET}/data/  
+~~~
+~~~
+cd ~/tfmodels/research
+wget http://download.tensorflow.org/models/object_detection/ssd_mobilenet_v1_coco_2017_11_17.tar.gz
+tar zxvf ssd_mobilenet_v1_coco_2017_11_17.tar.gz
+~~~
+~~~
+gsutil cp ssd_mobilenet_v1_coco_2017_11_17/model.ckpt.* ${YOUR_GCS_BUCKET}/data/
+~~~
+~~~
+cp object_detection/samples/configs/ssd_mobilenet_v1_coco.config .
+~~~
+~~~
+sed -i "s|PATH_TO_BE_CONFIGURED|"${YOUR_GCS_BUCKET}"/data|g" ssd_mobilenet_v1_coco.config
+sed -i 's|num_classes:\s*[0-9]\+|num_classes: 1|' ssd_mobilenet_v1_coco.config
+sed -i 's|mscoco_||g' ssd_mobilenet_v1_coco.config
+sed -i 's|num_examples:\s*[0-9]\+|num_examples: 40|' ssd_mobilenet_v1_coco.config
+sed -i 's|num_steps:\s*[0-9]\+|num_steps: 200|' ssd_mobilenet_v1_coco.config
+~~~
+~~~
+gsutil cp ssd_mobilenet_v1_coco.config ${YOUR_GCS_BUCKET}/data/
+gsutil ls ${YOUR_GCS_BUCKET}/data
+~~~
+~~~
+touch dummyfile
+gsutil cp dummyfile ${YOUR_GCS_BUCKET}/eval/
+gsutil cp dummyfile ${YOUR_GCS_BUCKET}/train/
+gsutil ls ${YOUR_GCS_BUCKET}
+~~~
+## ハンズオン６：人工知能の学習
+~~~
+gcloud ml-engine jobs submit training `whoami`_object_detection_`date +%s` \
+    --runtime-version=1.8 \
+    --job-dir=${YOUR_GCS_BUCKET}/train \
+    --packages dist/object_detection-0.1.tar.gz,slim/dist/slim-0.1.tar.gz \
+    --module-name object_detection.train \
+    --region us-central1 \
+    --scale-tier BASIC_GPU \
+    -- \
+    --train_dir=${YOUR_GCS_BUCKET}/train \
+    --pipeline_config_path=${YOUR_GCS_BUCKET}/data/ssd_mobilenet_v1_coco.config
+~~~
+## ハンズオン７：人工知能の取り出し
+~~~
+gsutil ls ${YOUR_GCS_BUCKET}/train
+gsutil cp ${YOUR_GCS_BUCKET}/train/model.ckpt-200.* .
+~~~
+~~~
+pip install --user --upgrade matplotlib
+~~~
+~~~
+python object_detection/export_inference_graph.py \
+    --input_type image_tensor \
+    --pipeline_config_path ssd_mobilenet_v1_coco.config  \
+    --trained_checkpoint_prefix model.ckpt-200 \
+    --output_directory raccoon_model
+~~~
+~~~
+ls raccoon_model
+~~~
+## ハンズオン８：人工知能の移植
+~~~
+wget https://raw.githubusercontent.com/opencv/opencv/40765c5f8d2476d91ac5aa85bf018f893b9442cd/samples/dnn/tf_text_graph_ssd.py
+python tf_text_graph_ssd.py --input raccoon_model/frozen_inference_graph.pb \
+  --output raccoon.pbtxt --num_classes 1
+~~~
+~~~
+dl raccoon.pbtxt
+~~~
+ハンズオン資料に従ってダウンロード  
+~~~
+gsutil cp raccoon_model/frozen_inference_graph.pb ${YOUR_GCS_BUCKET}
+~~~
+ハンズオン資料に従ってダウンロード  
